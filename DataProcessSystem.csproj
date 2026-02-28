@@ -63,7 +63,7 @@
         <Compile Include="Form1.Designer.cs">
             <DependentUpon>Form1.cs</DependentUpon>
         </Compile>
-        <Compile Include="ImageCapture.cs" />
+        <Compile Include="GeometryIsolator.cs" />
         <Compile Include="ModelExporter.cs" />
         <Compile Include="Program.cs"/>
         <Compile Include="Properties\AssemblyInfo.cs"/>

@@ -1,97 +1,121 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
+using System.Collections.Generic;
+using System.Diagnostics;
 using NXOpen;
+using NXOpen.UF;
 
 namespace DataProcessSystem
 {
     public class ModelExporter
     {
-        public static void ExportToSTP(Part workPart, string outputFolder)
+        public static void ExportToSTL(Part workPart, string outputFile)
         {
             if (workPart == null) return;
+            
+            string folder = Path.GetDirectoryName(outputFile);
+            if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+
+            UFSession theUF = UFSession.GetUFSession();
+            IntPtr fileHandle = IntPtr.Zero; 
+
+            try
+            {
+                // 1. 打开二进制 STL 文件
+                theUF.Std.OpenBinaryStlFile(outputFile, false, "Dataset_Export", out fileHandle);
+
+                if (fileHandle == IntPtr.Zero) throw new Exception("无法创建 STL 文件句柄。");
+
+                // 2. 遍历并存入实体
+                Body[] bodies = workPart.Bodies.ToArray();
+                foreach (Body b in bodies)
+                {
+                    if (b.IsSolidBody)
+                    {
+                        int numErrors;
+                        // 【修正点】：使用 .NET 包装后的数组类型
+                        UFStd.StlError[] errorInfo;
+
+                        // 参数: 句柄, 坐标系, 实体, min_len, max_len, 精度, out 错误数, out 错误数组
+                        theUF.Std.PutSolidInStlFile(
+                            fileHandle, 
+                            Tag.Null, 
+                            b.Tag, 
+                            0.0, 
+                            0.0, 
+                            0.01, 
+                            out numErrors, 
+                            out errorInfo // 这里不再使用 IntPtr，而是托管数组
+                        );
+                        
+                        // 注意：在 .NET 包装层中，这种 out 数组不需要手动调用 theUF.Free()
+                    }
+                }
+                Console.WriteLine($"[STL 写入成功] {outputFile}");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("STL 导出失败: " + ex.Message);
+            }
+            finally
+            {
+                if (fileHandle != IntPtr.Zero)
+                {
+                    theUF.Std.CloseStlFile(fileHandle);
+                }
+            }
+        }
+
+        // STP 导出 (保持之前那个稳健的外部 EXE 版本)
+        public static void ExportToSTP(string inputFilePath, string outputFolder)
+        {
+            if (!File.Exists(inputFilePath)) return;
             if (!Directory.Exists(outputFolder)) Directory.CreateDirectory(outputFolder);
 
-            string stpFileName = $"{Path.GetFileNameWithoutExtension(workPart.FullPath)}.stp";
+            string stpFileName = $"{Path.GetFileNameWithoutExtension(inputFilePath)}.stp";
             string outputFile = Path.Combine(Path.GetFullPath(outputFolder), stpFileName);
-
-            // 1. 设置转换器路径 (填入你找到的绝对路径)
             string translatorPath = @"E:\Program Files\Siemens\NX12.0\STEP214UG\step214ug.exe";
-
-            if (!File.Exists(translatorPath))
-            {
-                Console.WriteLine($"[错误] 找不到转换器，请检查路径: {translatorPath}");
-                return;
-            }
-
-            Console.WriteLine($"[DEBUG] 使用转换器: {translatorPath}");
-            Console.WriteLine($"[DEBUG] 正在导出: {workPart.FullPath}");
 
             try
             {
                 Process process = new Process();
                 process.StartInfo.FileName = translatorPath;
-                
-                // 【关键修改】参数格式改为：O="输出路径" "输入路径"
-                process.StartInfo.Arguments = $"O=\"{outputFile}\" \"{workPart.FullPath}\"";
-                
-                // 关键配置：隐藏窗口，重定向输出
+                process.StartInfo.Arguments = $"O=\"{outputFile}\" \"{inputFilePath}\"";
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.RedirectStandardOutput = true;
                 process.StartInfo.RedirectStandardError = true;
                 process.StartInfo.CreateNoWindow = true;
 
-                // 【关键修复】手动补全所有必要的环境变量
-                // 1. 推算 UGII_BASE_DIR (E:\Program Files\Siemens\NX12.0)
                 string baseDir = Path.GetDirectoryName(Path.GetDirectoryName(translatorPath));
-                
-                // 2. 推算 UGII_ROOT_DIR (E:\Program Files\Siemens\NX12.0\UGII) - 核心DLL都在这
                 string rootDir = Path.Combine(baseDir, "UGII");
-                
-                // 3. 推算 STEP214UG_DIR (E:\Program Files\Siemens\NX12.0\STEP214UG) - 报错里缺的那个
                 string stepDir = Path.Combine(baseDir, "STEP214UG");
-                
-                // 【关键修复】确保路径末尾有斜杠
-                if (!stepDir.EndsWith("\\"))
-                {
-                    stepDir += "\\";
-                }
+                if (!stepDir.EndsWith("\\")) stepDir += "\\";
 
-                // 设置变量
                 process.StartInfo.EnvironmentVariables["UGII_BASE_DIR"] = baseDir;
                 process.StartInfo.EnvironmentVariables["UGII_ROOT_DIR"] = rootDir;
                 process.StartInfo.EnvironmentVariables["STEP214UG_DIR"] = stepDir;
-                
-                // 还要确保 PATH 包含 UGII 目录，否则可能会报找不到 DLL
                 string currentPath = Environment.GetEnvironmentVariable("PATH") ?? "";
                 process.StartInfo.EnvironmentVariables["PATH"] = $"{rootDir};{currentPath}";
 
-                // 调试信息：打印一下我们设置了什么，方便排查
-                Console.WriteLine($"[DEBUG] 设置环境变量 STEP214UG_DIR = {stepDir}");
-
-                // 启动进程
                 process.Start();
-                
-                // 等待结束
+                // 【核心修复】：必须在 WaitForExit 之前读取数据，清空缓冲区，防止死锁
                 string output = process.StandardOutput.ReadToEnd();
                 string error = process.StandardError.ReadToEnd();
+                
                 process.WaitForExit();
-
-                // 检查结果
-                if (File.Exists(outputFile) && new FileInfo(outputFile).Length > 0)
+                // 可选：将转换器的输出打印到控制台，方便排查潜在错误
+                if (!string.IsNullOrEmpty(error) || output.Contains("Error"))
                 {
-                    Console.WriteLine("[成功] STP 导出完成！");
+                    Console.WriteLine($"[STP 转换信息]:\n{output}\n{error}");
                 }
                 else
                 {
-                    Console.WriteLine("[失败] STP 文件未生成。");
-                    Console.WriteLine($"转换器输出:\n{output}");
-                    Console.WriteLine($"错误信息:\n{error}");
+                    Console.WriteLine($"[STP 转换成功] {stpFileName}");
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[异常] 调用转换器出错: {ex.Message}");
+            catch (Exception ex) 
+            { 
+                Console.WriteLine("STP 异常: " + ex.Message); 
             }
         }
     }
