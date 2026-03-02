@@ -10,39 +10,54 @@ def generate_screenshots(input_file, output_folder):
         # 1. 加载模型
         mesh = pv.read(input_file)
         
-        # 【关键修复1】重新计算法线，并在锐角处分离顶点，消除机械零件的黑色渐变阴影
+        # 【关键：清理网格】STL 文件通常是散落的三角形，必须先清理并合并重合顶点
+        mesh = mesh.clean()
+        
+        # 重新计算法线，保证面片平整
         mesh = mesh.compute_normals(split_vertices=True)
+        
+        # 【美化核心：提取特征边缘】
+        # 提取夹角大于 30 度的边界线 (孔的边缘、零件外轮廓等)
+        edges = mesh.extract_feature_edges(boundary_edges=True, 
+                                           feature_edges=True, 
+                                           manifold_edges=False, 
+                                           feature_angle=30)
     except Exception as e:
         print(f"Error loading model: {e}")
         return
 
     # 2. 设置绘图窗口
-    plotter = pv.Plotter(off_screen=True)
+    # multi_samples=4 开启抗锯齿，让黑线更平滑
+    plotter = pv.Plotter(off_screen=True, window_size=[1024, 1024], line_smoothing=True)
     
-    # 【关键修复2】关闭平滑着色 (smooth_shading=False)，加入合适的环境光
-    plotter.add_mesh(mesh, color='#B0B0B0', smooth_shading=False, 
-                     ambient=0.3, diffuse=0.7, specular=0.2)
+    # 添加主模型 (使用类似 NX/SolidWorks 默认的高级蓝灰色)
+    plotter.add_mesh(mesh, color='#D0D5DB', smooth_shading=False, 
+                     ambient=0.3, diffuse=0.8, specular=0.1)
+                     
+    # 【美化核心：绘制黑线】把刚才提取的特征边盖在模型上面
+    plotter.add_mesh(edges, color='black', line_width=2.5)
+
     plotter.set_background("white")
 
-    # 【关键修复3】开启正交投影（工业制图标准，消除近大远小的透视变形）
+    # 开启正交投影（工业制图标准）
     plotter.enable_parallel_projection()
 
     base_name = os.path.splitext(os.path.basename(input_file))[0]
 
-    # 【关键修复4】使用 PyVista 官方的标准视图设置方法，自动处理 Up-Vector，消除警告
+    # 定义 6 个视角
     view_funcs = {
-        "TOP":    lambda: plotter.view_xy(),               # 俯视图 (看 XY 平面)
-        "BOTTOM": lambda: plotter.view_xy(negative=True),  # 仰视图
-        "FRONT":  lambda: plotter.view_xz(),               # 主视图 (看 XZ 平面)
-        "BACK":   lambda: plotter.view_xz(negative=True),  # 后视图
-        "RIGHT":  lambda: plotter.view_yz(),               # 右视图 (看 YZ 平面)
-        "LEFT":   lambda: plotter.view_yz(negative=True)   # 左视图
+        "TOP":    lambda: plotter.view_xy(),
+        "BOTTOM": lambda: plotter.view_xy(negative=True),
+        "FRONT":  lambda: plotter.view_xz(),
+        "BACK":   lambda: plotter.view_xz(negative=True),
+        "RIGHT":  lambda: plotter.view_yz(),
+        "LEFT":   lambda: plotter.view_yz(negative=True)
     }
 
     # 3. 循环截图
     for v_name, func in view_funcs.items():
-        func() # 调用对应的视角函数
-        plotter.reset_camera() # 自动缩放，让零件填满画面
+        func()
+        plotter.reset_camera()
         
         output_path = os.path.join(output_folder, f"{base_name}_{v_name}.png")
         plotter.screenshot(output_path)
