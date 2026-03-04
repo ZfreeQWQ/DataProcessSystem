@@ -34,31 +34,32 @@ namespace DataProcessSystem
             this.btnRun = new System.Windows.Forms.Button();
             this.rtbLog = new System.Windows.Forms.RichTextBox();
             this.pbPreview = new System.Windows.Forms.PictureBox();
+            this.btnSelectFolder = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.pbPreview)).BeginInit();
             this.SuspendLayout();
             // 
             // btnSelectFile
             // 
-            this.btnSelectFile.Location = new System.Drawing.Point(53, 51);
+            this.btnSelectFile.Location = new System.Drawing.Point(53, 36);
             this.btnSelectFile.Name = "btnSelectFile";
-            this.btnSelectFile.Size = new System.Drawing.Size(127, 25);
+            this.btnSelectFile.Size = new System.Drawing.Size(144, 25);
             this.btnSelectFile.TabIndex = 0;
-            this.btnSelectFile.Text = "选择 PRT 文件\r\n";
+            this.btnSelectFile.Text = "选择单文件 (.prt)";
             this.btnSelectFile.UseVisualStyleBackColor = true;
             this.btnSelectFile.Click += new System.EventHandler(this.btnSelectFile_Click);
             // 
             // txtFilePath
             // 
-            this.txtFilePath.Location = new System.Drawing.Point(199, 51);
+            this.txtFilePath.Location = new System.Drawing.Point(218, 51);
             this.txtFilePath.Name = "txtFilePath";
-            this.txtFilePath.Size = new System.Drawing.Size(340, 25);
+            this.txtFilePath.Size = new System.Drawing.Size(662, 25);
             this.txtFilePath.TabIndex = 1;
             // 
             // btnRun
             // 
             this.btnRun.Font = new System.Drawing.Font("宋体", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.btnRun.ForeColor = System.Drawing.SystemColors.ControlText;
-            this.btnRun.Location = new System.Drawing.Point(473, 91);
+            this.btnRun.Location = new System.Drawing.Point(450, 91);
             this.btnRun.Name = "btnRun";
             this.btnRun.Size = new System.Drawing.Size(149, 46);
             this.btnRun.TabIndex = 2;
@@ -76,18 +77,29 @@ namespace DataProcessSystem
             // 
             // pbPreview
             // 
-            this.pbPreview.Location = new System.Drawing.Point(417, 226);
+            this.pbPreview.Location = new System.Drawing.Point(399, 226);
             this.pbPreview.Name = "pbPreview";
             this.pbPreview.Size = new System.Drawing.Size(266, 220);
             this.pbPreview.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.pbPreview.TabIndex = 4;
             this.pbPreview.TabStop = false;
             // 
+            // btnSelectFolder
+            // 
+            this.btnSelectFolder.Location = new System.Drawing.Point(53, 67);
+            this.btnSelectFolder.Name = "btnSelectFolder";
+            this.btnSelectFolder.Size = new System.Drawing.Size(144, 25);
+            this.btnSelectFolder.TabIndex = 5;
+            this.btnSelectFolder.Text = "选择文件夹 (批量)";
+            this.btnSelectFolder.UseVisualStyleBackColor = true;
+            this.btnSelectFolder.Click += new System.EventHandler(this.btnSelectFolder_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1096, 614);
+            this.Controls.Add(this.btnSelectFolder);
             this.Controls.Add(this.pbPreview);
             this.Controls.Add(this.rtbLog);
             this.Controls.Add(this.btnRun);
@@ -100,6 +112,8 @@ namespace DataProcessSystem
             this.ResumeLayout(false);
             this.PerformLayout();
         }
+
+        private System.Windows.Forms.Button btnSelectFolder;
 
         private System.Windows.Forms.PictureBox pbPreview;
 

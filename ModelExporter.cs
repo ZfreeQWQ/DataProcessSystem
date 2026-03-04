@@ -15,6 +15,10 @@ namespace DataProcessSystem
             
             string folder = Path.GetDirectoryName(outputFile);
             if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+            if (File.Exists(outputFile))
+            {
+                File.Delete(outputFile);
+            }
 
             UFSession theUF = UFSession.GetUFSession();
             IntPtr fileHandle = IntPtr.Zero; 

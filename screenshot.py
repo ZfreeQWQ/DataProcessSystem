@@ -42,7 +42,10 @@ def generate_screenshots(input_file, output_folder):
     # 开启正交投影（工业制图标准）
     plotter.enable_parallel_projection()
 
-    base_name = os.path.splitext(os.path.basename(input_file))[0]
+    if len(sys.argv) > 3:
+            base_name = sys.argv[3]
+    else:
+        base_name = os.path.splitext(os.path.basename(input_file))[0]
 
     # 定义 6 个视角
     view_funcs = {
@@ -66,5 +69,7 @@ def generate_screenshots(input_file, output_folder):
     plotter.close()
 
 if __name__ == "__main__":
-    if len(sys.argv) > 2:
+    if len(sys.argv) > 3:
+        generate_screenshots(sys.argv[1], sys.argv[2])
+    elif len(sys.argv) > 2:
         generate_screenshots(sys.argv[1], sys.argv[2])

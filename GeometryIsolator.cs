@@ -69,6 +69,10 @@ namespace DataProcessSystem
 
                 // 4. 另存为临时文件
                 string tempPath = Path.Combine(Path.GetTempPath(), $"Design_Root_{Guid.NewGuid().ToString().Substring(0, 8)}.prt");
+                if (File.Exists(tempPath)) 
+                {
+                    File.Delete(tempPath);
+                }
                 workPart.SaveAs(tempPath);
                 
                 logMsg += $"[成功] 纯净模型已生成。\r\n";
