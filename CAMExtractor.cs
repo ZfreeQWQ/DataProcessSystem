@@ -20,6 +20,13 @@ namespace DataProcessSystem
             PartDataset dataset = new PartDataset();
             dataset.PartName = Path.GetFileNameWithoutExtension(workPart.FullPath);
             dataset.ExtractTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            // 尝试获取零件材质
+            try 
+            {
+                NXOpen.PhysicalMaterial[] mats = workPart.MaterialManager.PhysicalMaterials.GetUsedMaterials();
+                if (mats.Length > 0) dataset.Material = mats[0].Name;
+            } 
+            catch { }
 
             UFSession theUF = UFSession.GetUFSession();
 
@@ -42,6 +49,11 @@ namespace DataProcessSystem
                         ToolInfo tInfo = new ToolInfo();
                         tInfo.ToolName = group.Name;
                         tInfo.ToolType = group.GetType().Name;
+                        
+                        int tNum = 0;
+                        // 在 NX API 中，刀位号通常对应某个特定整型参数，提取失败则默认为 0
+                        try { theUF.Param.AskIntValue(group.Tag, 2, out tNum); } catch { } 
+                        tInfo.ToolNumber = tNum;
                         
                         double dia = 0;
                         try { theUF.Param.AskDoubleValue(group.Tag, 1, out dia); } catch { }

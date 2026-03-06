@@ -50,7 +50,6 @@ namespace DataProcessSystem
             if (dlg.ShowDialog() == DialogResult.OK)
             {
                 txtFilePath.Text = dlg.FileName;
-                ShowPreviewImmediately(dlg.FileName);
             }
         }
 
@@ -228,6 +227,16 @@ namespace DataProcessSystem
                 CAMExtractor.SaveToJsonFile(dataModel, jsonFolder);
                 Log($"[成功] 结构化数据集文件已保存至 output_json 文件夹。");
                 
+                Log("正在界面上渲染结构化一维/二维数据...");
+                string baseDir = Path.GetDirectoryName(filePath);
+                // 1. 显示左侧树状文本
+                Display1DData(dataModel);
+                // 1.5 生成自然语言 Prompt 并存入隐藏的文本框
+                rtbPrompt.Text = GenerateNaturalLanguagePrompt(dataModel);
+                // 2. 显示右侧六视图
+                Display2DImages(dataModel, baseDir);
+                Log("✅ 界面渲染完成！");
+                
             }
             finally
             {
@@ -285,11 +294,145 @@ namespace DataProcessSystem
             Application.DoEvents();
         }
         
-        private void ShowPreviewImmediately(string filePath)
+        // 展示一维结构化工艺数据
+        private void Display1DData(PartDataset dataModel)
         {
-            // 预览图功能暂时留空，避免干扰核心功能
-            pbPreview.Image = null; 
-            Log("已选中文件，准备就绪。");
+            // 清空上次的数据
+            treeViewData.Nodes.Clear();
+    
+            // 根节点：零件名称
+            TreeNode rootNode = treeViewData.Nodes.Add($"零件: {dataModel.PartName}");
+            rootNode.NodeFont = new Font(treeViewData.Font, FontStyle.Bold); // 加粗突出显示
+    
+            // 节点 1：刀具列表
+            TreeNode toolsNode = rootNode.Nodes.Add($"所用刀具 ({dataModel.Tools.Count}把)");
+            foreach (var tool in dataModel.Tools)
+            {
+                toolsNode.Nodes.Add($"[{tool.ToolType}] {tool.ToolName} (Φ{tool.Diameter}mm)");
+            }
+
+            // 节点 2：工艺路线 (工序)
+            TreeNode opsNode = rootNode.Nodes.Add($"工艺路线 ({dataModel.Operations.Count}道工序)");
+            foreach (var op in dataModel.Operations)
+            {
+                TreeNode stepNode = opsNode.Nodes.Add($"Step {op.StepIndex}: {op.OperationName}");
+                stepNode.Nodes.Add($"加工类型: {op.OperationType}");
+                stepNode.Nodes.Add($"主轴转速: {op.SpindleSpeed_RPM} RPM");
+                stepNode.Nodes.Add($"进给速率: {op.FeedRate_MMPM} mm/min");
+        
+                if (!string.IsNullOrEmpty(op.UsedToolName))
+                {
+                    stepNode.Nodes.Add($"绑定刀具: {op.UsedToolName}");
+                }
+            }
+    
+            // 展开所有节点以便直接查看
+            treeViewData.ExpandAll();
+            // 让滚动条回到最顶端
+            treeViewData.SelectedNode = rootNode;
+        }
+        
+        // 展示二维多视角渲染图
+        private void Display2DImages(PartDataset dataModel, string workDirectory)
+        {
+            // 清空上次的图片缓存
+            // 必须释放掉以前创建的 PictureBox 的图片资源，防止内存泄漏
+            foreach (Control ctrl in flowLayoutPanelImages.Controls)
+            {
+                if (ctrl is PictureBox pb && pb.Image != null)
+                {
+                    pb.Image.Dispose();
+                }
+            }
+            flowLayoutPanelImages.Controls.Clear();
+
+            // 遍历数据模型中的相对路径
+            foreach (string relativePath in dataModel.ViewImages)
+            {
+                // 拼接成绝对路径 (把 Linux 的 / 换成 Windows 的 \，防止路径识别错误)
+                string fullPath = Path.Combine(workDirectory, relativePath.Replace("/", "\\"));
+        
+                if (File.Exists(fullPath))
+                {
+                    // 动态创建一个 PictureBox
+                    PictureBox pb = new PictureBox();
+                    pb.Width = 220;   // 你可以根据界面大小调整图片的宽高
+                    pb.Height = 220;
+                    pb.SizeMode = PictureBoxSizeMode.Zoom; // 保证图片等比例缩放不拉伸
+                    pb.BorderStyle = BorderStyle.FixedSingle; // 给图片加个边框看起来更规整
+                    pb.Margin = new Padding(10); // 设置图片之间的间距
+
+                    // ⚠️ 极其关键的一步：使用 FileStream 读取图片！
+                    // 不要直接用 Image.FromFile(fullPath)，那会锁死文件导致后续批量处理时无法覆盖旧图片
+                    using (FileStream fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read))
+                    {
+                        // 将图片从内存流中克隆一份，彻底解除文件占用
+                        Image tempImg = Image.FromStream(fs);
+                        pb.Image = new Bitmap(tempImg);
+                    }
+            
+                    // 将图片添加到 FlowLayoutPanel
+                    flowLayoutPanelImages.Controls.Add(pb);
+                    Application.DoEvents(); // 让界面刷新，不要卡死
+                }
+                else
+                {
+                    Log($"[警告] 找不到预览图文件: {fullPath}");
+                }
+            }
+        }
+        
+        // 核心创新点：自然语言工艺提示词生成器 (NLG)
+        private string GenerateNaturalLanguagePrompt(PartDataset dataModel)
+        {
+            System.Text.StringBuilder prompt = new System.Text.StringBuilder();
+
+            prompt.AppendLine("【系统提示】你是一个资深的航空航天非标零件机械加工工艺专家。请根据以下结构化工艺数据，分析该零件的加工难点并评估加工策略。\n");
+            prompt.AppendLine("【零件基本信息】");
+            prompt.AppendLine($"当前待加工零件名称为“{dataModel.PartName}”。经过系统自动解析，该零件的制造材质为“{dataModel.Material}”。");
+            prompt.AppendLine($"为完成该零件的加工，制造端共配置了 {dataModel.Tools.Count} 把刀具，工艺路线共包含 {dataModel.Operations.Count} 道加工工序。\n");
+
+            prompt.AppendLine("【刀具库清单】");
+            foreach (var tool in dataModel.Tools)
+            {
+                prompt.AppendLine($"- T{tool.ToolNumber}号刀具：属于 {tool.ToolType} 类型，名称为 {tool.ToolName}，其公称直径为 {tool.Diameter} mm。");
+            }
+            prompt.AppendLine();
+
+            prompt.AppendLine("【详细工艺执行路线】");
+            foreach (var op in dataModel.Operations)
+            {
+                prompt.Append($"第 {op.StepIndex} 步，执行 {op.OperationName} 工序（操作类型：{op.OperationType}）。");
+                if (!string.IsNullOrEmpty(op.UsedToolName))
+                {
+                    prompt.Append($"本工序调用了 {op.UsedToolName} 进行切削。");
+                }
+                prompt.AppendLine($"切削参数设定为：主轴转速 {op.SpindleSpeed_RPM} RPM，进给速率 {op.FeedRate_MMPM} mm/min。");
+            }
+
+            prompt.AppendLine("\n【用户指令】请基于上述参数，评估这些切削参数对于该材质是否合理，并输出一份工艺优化建议报告。");
+
+            return prompt.ToString();
+        }
+
+        private void btnToggleView_Click(object sender, EventArgs e)
+        {
+            // 如果当前显示的是树状图 (结构化数据)
+            if (treeViewData.Visible)
+            {
+                treeViewData.Visible = false;
+                rtbPrompt.Visible = true;
+                btnToggleView.Text = "切换至结构化数据 (JSON)";
+                btnToggleView.BackColor = Color.LightGreen; // 给个颜色提示
+            }
+            else
+            {
+                // 如果当前显示的是文本 (自然语言)
+                rtbPrompt.Visible = false;
+                treeViewData.Visible = true;
+                btnToggleView.Text = "切换至大模型提示词 (Prompt)";
+                btnToggleView.BackColor = SystemColors.Control;
+            }
         }
     }
 }

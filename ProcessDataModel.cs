@@ -16,6 +16,7 @@ namespace DataProcessSystem
         // 工艺信息
         public List<ToolInfo> Tools { get; set; } = new List<ToolInfo>();
         public List<OperationInfo> Operations { get; set; } = new List<OperationInfo>();
+        public string Material { get; set; } = "未指定"; // 新增：零件材质
     }
 
     // 刀具信息
@@ -24,6 +25,7 @@ namespace DataProcessSystem
         public string ToolName { get; set; }
         public string ToolType { get; set; }
         public double Diameter { get; set; }
+        public int ToolNumber { get; set; } // 新增：刀位号(T号)
     }
 
     // 工序信息

@@ -58,7 +58,6 @@
         <Reference Include="System.Xml"/>
     </ItemGroup>
     <ItemGroup>
-        <Compile Include="AssemblyAnalyzer.cs" />
         <Compile Include="CAMExtractor.cs" />
         <Compile Include="Form1.cs">
             <SubType>Form</SubType>
