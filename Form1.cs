@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -14,6 +15,9 @@ namespace DataProcessSystem
     {
         private Session theSession;
         private UFSession theUFSession;
+        private List<PartDataset> batchDatasets = new List<PartDataset>();
+        private int currentDataIndex = -1;
+        private string currentBaseDir = "";
 
         public Form1()
         {
@@ -97,19 +101,24 @@ namespace DataProcessSystem
                     Log($"\r\n====== 开始单文件处理: {Path.GetFileName(inputPath)} ======");
                     ProcessSinglePart(inputPath);
                     Log("====== 处理完成 ======");
+                    
+                    string expectedJson = Path.Combine(Path.GetDirectoryName(inputPath), "output_json", Path.GetFileNameWithoutExtension(inputPath) + ".json");
+                    currentBaseDir = Path.GetDirectoryName(inputPath);
+                    
+                    // 把这个单独的路径放到 List 里传过去
+                    LoadResultsToDashboard(new List<string> { expectedJson });
                 }
                 else if (Directory.Exists(inputPath))
                 {
                     // 批量文件夹处理
                     string[] prtFiles = Directory.GetFiles(inputPath, "*.prt");
-                    if (prtFiles.Length == 0)
-                    {
-                        Log("该文件夹下没有找到 PRT 文件。");
-                        return;
-                    }
+                    if (prtFiles.Length == 0) return;
 
                     Log($"\r\n====== 启动批量任务，共发现 {prtFiles.Length} 个文件 ======");
                     int successCount = 0;
+                    
+                    // [新增] 用于记录本次成功处理了哪些 JSON 文件
+                    List<string> successfulJsons = new List<string>();
 
                     for (int i = 0; i < prtFiles.Length; i++)
                     {
@@ -118,6 +127,10 @@ namespace DataProcessSystem
                         {
                             ProcessSinglePart(prtFiles[i]);
                             successCount++;
+                            
+                            // [新增] 处理成功一个，就把它的期望 JSON 路径记录下来
+                            string expectedJson = Path.Combine(inputPath, "output_json", Path.GetFileNameWithoutExtension(prtFiles[i]) + ".json");
+                            successfulJsons.Add(expectedJson);
                         }
                         catch (Exception ex)
                         {
@@ -125,6 +138,10 @@ namespace DataProcessSystem
                         }
                     }
                     Log($"\r\n====== 批量任务结束！成功: {successCount}/{prtFiles.Length} ======");
+
+                    // [修改这里] 只加载本次成功生成的那些 JSON
+                    currentBaseDir = inputPath;
+                    LoadResultsToDashboard(successfulJsons);
                 }
                 else
                 {
@@ -226,17 +243,6 @@ namespace DataProcessSystem
                 string jsonFolder = Path.Combine(Path.GetDirectoryName(filePath), "output_json");
                 CAMExtractor.SaveToJsonFile(dataModel, jsonFolder);
                 Log($"[成功] 结构化数据集文件已保存至 output_json 文件夹。");
-                
-                Log("正在界面上渲染结构化一维/二维数据...");
-                string baseDir = Path.GetDirectoryName(filePath);
-                // 1. 显示左侧树状文本
-                Display1DData(dataModel);
-                // 1.5 生成自然语言 Prompt 并存入隐藏的文本框
-                rtbPrompt.Text = GenerateNaturalLanguagePrompt(dataModel);
-                // 2. 显示右侧六视图
-                Display2DImages(dataModel, baseDir);
-                Log("✅ 界面渲染完成！");
-                
             }
             finally
             {
@@ -335,49 +341,47 @@ namespace DataProcessSystem
         // 展示二维多视角渲染图
         private void Display2DImages(PartDataset dataModel, string workDirectory)
         {
-            // 清空上次的图片缓存
-            // 必须释放掉以前创建的 PictureBox 的图片资源，防止内存泄漏
+            // 1. 安全清空旧图片，释放内存（重要：不仅释放Image，还要释放PictureBox控件本身）
             foreach (Control ctrl in flowLayoutPanelImages.Controls)
             {
-                if (ctrl is PictureBox pb && pb.Image != null)
+                if (ctrl is PictureBox oldPb)
                 {
-                    pb.Image.Dispose();
+                    if (oldPb.Image != null) oldPb.Image.Dispose();
+                    oldPb.Dispose();
                 }
             }
             flowLayoutPanelImages.Controls.Clear();
 
-            // 遍历数据模型中的相对路径
+            // 2. 遍历加载新图片
             foreach (string relativePath in dataModel.ViewImages)
             {
-                // 拼接成绝对路径 (把 Linux 的 / 换成 Windows 的 \，防止路径识别错误)
                 string fullPath = Path.Combine(workDirectory, relativePath.Replace("/", "\\"));
         
                 if (File.Exists(fullPath))
                 {
-                    // 动态创建一个 PictureBox
-                    PictureBox pb = new PictureBox();
-                    pb.Width = 220;   // 你可以根据界面大小调整图片的宽高
-                    pb.Height = 220;
-                    pb.SizeMode = PictureBoxSizeMode.Zoom; // 保证图片等比例缩放不拉伸
-                    pb.BorderStyle = BorderStyle.FixedSingle; // 给图片加个边框看起来更规整
-                    pb.Margin = new Padding(10); // 设置图片之间的间距
-
-                    // ⚠️ 极其关键的一步：使用 FileStream 读取图片！
-                    // 不要直接用 Image.FromFile(fullPath)，那会锁死文件导致后续批量处理时无法覆盖旧图片
-                    using (FileStream fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read))
+                    PictureBox pb = new PictureBox
                     {
-                        // 将图片从内存流中克隆一份，彻底解除文件占用
-                        Image tempImg = Image.FromStream(fs);
-                        pb.Image = new Bitmap(tempImg);
+                        Width = 220,
+                        Height = 220,
+                        SizeMode = PictureBoxSizeMode.Zoom,
+                        BorderStyle = BorderStyle.FixedSingle,
+                        Margin = new Padding(10)
+                    };
+
+                    try
+                    {
+                        // 【终极修复】：将文件直接读取为纯字节数组，存入内存流
+                        // 这样生成的 Image 完全独立存在于内存，永远不会去读磁盘，完美解决“参数无效”报错
+                        byte[] imageBytes = File.ReadAllBytes(fullPath);
+                        MemoryStream ms = new MemoryStream(imageBytes);
+                        pb.Image = Image.FromStream(ms);
+                
+                        flowLayoutPanelImages.Controls.Add(pb);
                     }
-            
-                    // 将图片添加到 FlowLayoutPanel
-                    flowLayoutPanelImages.Controls.Add(pb);
-                    Application.DoEvents(); // 让界面刷新，不要卡死
-                }
-                else
-                {
-                    Log($"[警告] 找不到预览图文件: {fullPath}");
+                    catch (Exception ex)
+                    {
+                        Log($"[警告] 图片加载失败 {fullPath}: {ex.Message}");
+                    }
                 }
             }
         }
@@ -432,6 +436,78 @@ namespace DataProcessSystem
                 treeViewData.Visible = true;
                 btnToggleView.Text = "切换至大模型提示词 (Prompt)";
                 btnToggleView.BackColor = SystemColors.Control;
+            }
+        }
+
+        private void btnPrev_Click(object sender, EventArgs e)
+        {
+            if (currentDataIndex > 0)
+            {
+                currentDataIndex--;
+                UpdateDashboard();
+            }
+        }
+
+        private void btnNext_Click(object sender, EventArgs e)
+        {
+            if (currentDataIndex < batchDatasets.Count - 1)
+            {
+                currentDataIndex++;
+                UpdateDashboard();
+            }
+        }
+        private void UpdateDashboard()
+        {
+            if (batchDatasets == null || batchDatasets.Count == 0 || currentDataIndex < 0) return;
+
+            PartDataset currentData = batchDatasets[currentDataIndex];
+    
+            // 刷新页码
+            lblPage.Text = $"{currentDataIndex + 1} / {batchDatasets.Count}";
+    
+            // 控制按钮是否可用
+            btnPrev.Enabled = (currentDataIndex > 0);
+            btnNext.Enabled = (currentDataIndex < batchDatasets.Count - 1);
+
+            // 渲染一维和二维数据
+            Display1DData(currentData);
+            rtbPrompt.Text = GenerateNaturalLanguagePrompt(currentData); // 如果你加了 Prompt 功能
+            Display2DImages(currentData, currentBaseDir);
+
+            Log($"正在查看: {currentData.PartName}");
+        }
+        
+        private void LoadResultsToDashboard(List<string> jsonFilesList)
+        {
+            batchDatasets.Clear();
+            currentDataIndex = -1;
+
+            foreach (string file in jsonFilesList)
+            {
+                try
+                {
+                    if (File.Exists(file))
+                    {
+                        // 读取 JSON 结构化数据
+                        string jsonContent = File.ReadAllText(file, System.Text.Encoding.UTF8);
+                        PartDataset ds = Newtonsoft.Json.JsonConvert.DeserializeObject<PartDataset>(jsonContent);
+                        if (ds != null)
+                        {
+                            batchDatasets.Add(ds);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[警告] 读取数据集文件失败: {file}, 错误: {ex.Message}");
+                }
+            }
+
+            if (batchDatasets.Count > 0)
+            {
+                currentDataIndex = 0;
+                Log($"\r\n>>> 成功加载 {batchDatasets.Count} 个零件数据集，可使用【上一个/下一个】浏览。");
+                UpdateDashboard(); // 刷新界面
             }
         }
     }

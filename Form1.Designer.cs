@@ -43,6 +43,9 @@ namespace DataProcessSystem
             this.groupBox4 = new System.Windows.Forms.GroupBox();
             this.rtbPrompt = new System.Windows.Forms.RichTextBox();
             this.btnToggleView = new System.Windows.Forms.Button();
+            this.btnPrev = new System.Windows.Forms.Button();
+            this.btnNext = new System.Windows.Forms.Button();
+            this.lblPage = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // btnSelectFile
@@ -168,19 +171,54 @@ namespace DataProcessSystem
             // 
             // btnToggleView
             // 
-            this.btnToggleView.Location = new System.Drawing.Point(314, 250);
+            this.btnToggleView.Location = new System.Drawing.Point(314, 237);
             this.btnToggleView.Name = "btnToggleView";
-            this.btnToggleView.Size = new System.Drawing.Size(29, 116);
+            this.btnToggleView.Size = new System.Drawing.Size(29, 162);
             this.btnToggleView.TabIndex = 14;
             this.btnToggleView.Text = "切换数据";
             this.btnToggleView.UseVisualStyleBackColor = true;
             this.btnToggleView.Click += new System.EventHandler(this.btnToggleView_Click);
+            // 
+            // btnPrev
+            // 
+            this.btnPrev.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.btnPrev.Location = new System.Drawing.Point(450, 438);
+            this.btnPrev.Name = "btnPrev";
+            this.btnPrev.Size = new System.Drawing.Size(31, 28);
+            this.btnPrev.TabIndex = 15;
+            this.btnPrev.Text = "<";
+            this.btnPrev.UseVisualStyleBackColor = true;
+            this.btnPrev.Click += new System.EventHandler(this.btnPrev_Click);
+            // 
+            // btnNext
+            // 
+            this.btnNext.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.btnNext.Location = new System.Drawing.Point(568, 438);
+            this.btnNext.Name = "btnNext";
+            this.btnNext.Size = new System.Drawing.Size(31, 28);
+            this.btnNext.TabIndex = 16;
+            this.btnNext.Text = ">";
+            this.btnNext.UseVisualStyleBackColor = true;
+            this.btnNext.Click += new System.EventHandler(this.btnNext_Click);
+            // 
+            // lblPage
+            // 
+            this.lblPage.Font = new System.Drawing.Font("宋体", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.lblPage.Location = new System.Drawing.Point(489, 441);
+            this.lblPage.Name = "lblPage";
+            this.lblPage.Size = new System.Drawing.Size(72, 25);
+            this.lblPage.TabIndex = 17;
+            this.lblPage.Text = "0 / 0";
+            this.lblPage.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1096, 614);
+            this.Controls.Add(this.lblPage);
+            this.Controls.Add(this.btnNext);
+            this.Controls.Add(this.btnPrev);
             this.Controls.Add(this.btnToggleView);
             this.Controls.Add(this.rtbPrompt);
             this.Controls.Add(this.groupBox4);
@@ -201,6 +239,12 @@ namespace DataProcessSystem
             this.ResumeLayout(false);
             this.PerformLayout();
         }
+
+        private System.Windows.Forms.Label lblPage;
+
+        private System.Windows.Forms.Button btnNext;
+
+        private System.Windows.Forms.Button btnPrev;
 
         private System.Windows.Forms.Button btnToggleView;
 
