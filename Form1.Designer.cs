@@ -79,6 +79,7 @@ namespace DataProcessSystem
             // 
             // rtbLog
             // 
+            this.rtbLog.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
             this.rtbLog.Location = new System.Drawing.Point(-4, 466);
             this.rtbLog.Name = "rtbLog";
             this.rtbLog.Size = new System.Drawing.Size(1102, 151);
@@ -97,6 +98,7 @@ namespace DataProcessSystem
             // 
             // treeViewData
             // 
+            this.treeViewData.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) | System.Windows.Forms.AnchorStyles.Left)));
             this.treeViewData.Location = new System.Drawing.Point(22, 206);
             this.treeViewData.Name = "treeViewData";
             this.treeViewData.Size = new System.Drawing.Size(293, 227);
@@ -104,6 +106,7 @@ namespace DataProcessSystem
             // 
             // panel3D
             // 
+            this.panel3D.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
             this.panel3D.BackColor = System.Drawing.SystemColors.ControlDark;
             this.panel3D.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.panel3D.Location = new System.Drawing.Point(369, 205);
@@ -113,6 +116,7 @@ namespace DataProcessSystem
             // 
             // flowLayoutPanelImages
             // 
+            this.flowLayoutPanelImages.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) | System.Windows.Forms.AnchorStyles.Right)));
             this.flowLayoutPanelImages.AutoScroll = true;
             this.flowLayoutPanelImages.Location = new System.Drawing.Point(757, 204);
             this.flowLayoutPanelImages.Name = "flowLayoutPanelImages";
@@ -163,6 +167,7 @@ namespace DataProcessSystem
             // 
             // rtbPrompt
             // 
+            this.rtbPrompt.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) | System.Windows.Forms.AnchorStyles.Left)));
             this.rtbPrompt.Location = new System.Drawing.Point(22, 206);
             this.rtbPrompt.Name = "rtbPrompt";
             this.rtbPrompt.ReadOnly = true;
