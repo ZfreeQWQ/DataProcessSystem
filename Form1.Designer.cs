@@ -104,6 +104,8 @@ namespace DataProcessSystem
             // 
             // panel3D
             // 
+            this.panel3D.BackColor = System.Drawing.SystemColors.ControlDark;
+            this.panel3D.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.panel3D.Location = new System.Drawing.Point(369, 205);
             this.panel3D.Name = "panel3D";
             this.panel3D.Size = new System.Drawing.Size(337, 227);

@@ -8,6 +8,9 @@ using NXOpen.CAM;
 using NXOpen.UF;
 using Path = System.IO.Path;
 using System.Diagnostics; // 用于启动进程
+using System.Windows.Forms.Integration; // 用于在 WinForms 嵌入 WPF
+using HelixToolkit.Wpf;                 // 3D 引擎
+using System.Windows.Media.Media3D;     // 3D 数学模型
 
 namespace DataProcessSystem
 {
@@ -188,20 +191,17 @@ namespace DataProcessSystem
                 rtbLog.AppendText(isolationLog);
                 Log($"提取完成，临时文件: {Path.GetFileName(tempPrtPath)}");
 
-                // 5. 导出临时 STL (专门用于 Python 截图)
+                // 5. 导出临时 STL (用于 Python 截图)
                 Log("正在生成渲染网格 (STL)...");
                 tempStlPath = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(tempPrtPath) + ".stl");
-                
-                // 【注意】：为了防止批量时上一轮的STL没删干净，加一句保护
                 if (File.Exists(tempStlPath)) File.Delete(tempStlPath);
-
                 ModelExporter.ExportToSTL(workPart, tempStlPath);
 
                 // 6. 导出 STP (用于数据集存储)
                 Log("正在导出高精模型 (STP)...");
                 string outputDir = Path.Combine(Path.GetDirectoryName(filePath), "output_data");
+                if (!Directory.Exists(outputDir)) Directory.CreateDirectory(outputDir);
                 
-                // 外部转换器是读磁盘上的文件，所以传 tempPrtPath 是没问题的
                 ModelExporter.ExportToSTP(tempPrtPath, outputDir);
                 
                 // ---------------------------------------------------------
@@ -227,6 +227,12 @@ namespace DataProcessSystem
                 
                 // 记录 STP 的相对路径到 JSON 中
                 dataModel.ModelFile_STP = $"output_data/{finalStpName}";
+                
+                // 新增：将 STL 也保存到数据集中
+                string finalStlName = Path.GetFileNameWithoutExtension(filePath) + ".stl";
+                string targetStlPath = Path.Combine(outputDir, finalStlName);
+                File.Copy(tempStlPath, targetStlPath, true); // 拷贝一份作为永久数据集资产
+                dataModel.ModelFile_STL = $"output_data/{finalStlName}"; // 记录相对路径
 
                 // 7. 调用 Python 渲染引擎 (传入 STL 路径)
                 Log("启动 Python 渲染引擎生成六视图...");
@@ -386,6 +392,69 @@ namespace DataProcessSystem
             }
         }
         
+        // 展示三维可交互模型
+        private void Display3DModel(PartDataset dataModel, string workDirectory)
+        {
+            // 1. 获取刚刚记录在 JSON 中的 STL 路径
+            if (string.IsNullOrEmpty(dataModel.ModelFile_STL)) return;
+    
+            string fullPath = Path.Combine(workDirectory, dataModel.ModelFile_STL.Replace("/", "\\"));
+            if (!File.Exists(fullPath))
+            {
+                Log($"[警告] 找不到用于 3D 预览的 STL 文件: {fullPath}");
+                return;
+            }
+
+            try
+            {
+                // 2. 清理之前的 3D 控件，释放内存
+                panel3D.Controls.Clear();
+
+                // 3. 创建 WPF 的 3D 视口
+                HelixViewport3D viewport3D = new HelixViewport3D();
+                viewport3D.ShowFrameRate = true;     // 显示帧率，增加科技感
+                viewport3D.ShowViewCube = true;      // 显示右上角的视角导航立方体
+                viewport3D.ZoomExtentsWhenLoaded = true; // 加载后自动缩放到合适大小
+
+                // 4. 添加默认光源（类似 NX 的光照环境）
+                viewport3D.Children.Add(new DefaultLights());
+
+                // 5. 使用 HelixToolkit 的读取器解析 STL 文件
+                StLReader reader = new StLReader();
+                Model3DGroup modelGroup = reader.Read(fullPath);
+
+                // 6. 给模型赋予工业灰色的材质
+                System.Windows.Media.Color industrialColor = System.Windows.Media.Color.FromRgb(200, 205, 210);
+                System.Windows.Media.Media3D.Material material = MaterialHelper.CreateMaterial(industrialColor);
+        
+                // 遍历几何体并赋予材质
+                foreach (var model in modelGroup.Children)
+                {
+                    if (model is GeometryModel3D geomModel)
+                    {
+                        geomModel.Material = material;
+                        geomModel.BackMaterial = material; // 保证内外双面渲染
+                    }
+                }
+
+                // 7. 将模型包装成可视化对象并加入视口
+                ModelVisual3D visual3D = new ModelVisual3D();
+                visual3D.Content = modelGroup;
+                viewport3D.Children.Add(visual3D);
+
+                // 8. 创建桥接器，把 WPF 控件塞进 WinForms 的 Panel 中
+                ElementHost host = new ElementHost();
+                host.Dock = DockStyle.Fill;
+                host.Child = viewport3D;
+        
+                panel3D.Controls.Add(host);
+            }
+            catch (Exception ex)
+            {
+                Log($"[错误] 3D 模型渲染失败: {ex.Message}");
+            }
+        }
+        
         // 核心创新点：自然语言工艺提示词生成器 (NLG)
         private string GenerateNaturalLanguagePrompt(PartDataset dataModel)
         {
@@ -473,6 +542,8 @@ namespace DataProcessSystem
             Display1DData(currentData);
             rtbPrompt.Text = GenerateNaturalLanguagePrompt(currentData); // 如果你加了 Prompt 功能
             Display2DImages(currentData, currentBaseDir);
+            // 渲染三维模型
+            Display3DModel(currentData, currentBaseDir);
 
             Log($"正在查看: {currentData.PartName}");
         }

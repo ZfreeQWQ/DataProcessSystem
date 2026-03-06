@@ -11,6 +11,7 @@ namespace DataProcessSystem
         
         // 关联的文件路径（相对路径，方便数据集移动）
         public string ModelFile_STP { get; set; }
+        public string ModelFile_STL { get; set; }
         public List<string> ViewImages { get; set; } = new List<string>();
 
         // 工艺信息

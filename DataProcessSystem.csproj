@@ -33,6 +33,9 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
+        <Reference Include="HelixToolkit.Wpf, Version=2.24.0.0, Culture=neutral, PublicKeyToken=52aa3500039caf0d, processorArchitecture=MSIL">
+          <HintPath>packages\HelixToolkit.Wpf.2.24.0\lib\net462\HelixToolkit.Wpf.dll</HintPath>
+        </Reference>
         <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
           <HintPath>packages\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
         </Reference>
@@ -45,8 +48,11 @@
         <Reference Include="NXOpen.Utilities">
           <HintPath>..\..\..\..\Program Files\Siemens\NX12.0\NXBIN\managed\NXOpen.Utilities.dll</HintPath>
         </Reference>
+        <Reference Include="PresentationCore" />
+        <Reference Include="PresentationFramework" />
         <Reference Include="System"/>
         <Reference Include="System.Core"/>
+        <Reference Include="System.Xaml" />
         <Reference Include="System.Xml.Linq"/>
         <Reference Include="System.Data.DataSetExtensions"/>
         <Reference Include="Microsoft.CSharp"/>
@@ -56,6 +62,8 @@
         <Reference Include="System.Net.Http"/>
         <Reference Include="System.Windows.Forms"/>
         <Reference Include="System.Xml"/>
+        <Reference Include="WindowsBase" />
+        <Reference Include="WindowsFormsIntegration" />
     </ItemGroup>
     <ItemGroup>
         <Compile Include="CAMExtractor.cs" />
