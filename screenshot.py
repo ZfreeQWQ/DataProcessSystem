@@ -54,7 +54,8 @@ def generate_screenshots(input_file, output_folder):
         "FRONT":  lambda: plotter.view_xz(),
         "BACK":   lambda: plotter.view_xz(negative=True),
         "RIGHT":  lambda: plotter.view_yz(),
-        "LEFT":   lambda: plotter.view_yz(negative=True)
+        "LEFT":   lambda: plotter.view_yz(negative=True),
+        "ISO":    lambda: plotter.view_isometric()
     }
 
     # 3. 循环截图

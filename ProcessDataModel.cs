@@ -39,5 +39,6 @@ namespace DataProcessSystem
         public double FeedRate_MMPM { get; set; }
         // 进阶：如果工序有使用的刀具，也可以存在这里
         public string UsedToolName { get; set; } 
+        public double MachiningTime_MIN { get; set; } 
     }
 }

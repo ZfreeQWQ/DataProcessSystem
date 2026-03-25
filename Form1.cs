@@ -239,7 +239,7 @@ namespace DataProcessSystem
                 string imageFolder = Path.Combine(Path.GetDirectoryName(filePath), "output_images");
                 string baseName = Path.GetFileNameWithoutExtension(filePath);
                 RunPythonScreenshot(tempStlPath, imageFolder, baseName);
-                string[] views = { "TOP", "BOTTOM", "FRONT", "BACK", "LEFT", "RIGHT" };
+                string[] views = { "TOP", "BOTTOM", "FRONT", "BACK", "LEFT", "RIGHT", "ISO" };
                 foreach(string v in views)
                 {
                     dataModel.ViewImages.Add($"output_images/{baseName}_{v}.png");
@@ -329,6 +329,7 @@ namespace DataProcessSystem
             {
                 TreeNode stepNode = opsNode.Nodes.Add($"Step {op.StepIndex}: {op.OperationName}");
                 stepNode.Nodes.Add($"加工类型: {op.OperationType}");
+                stepNode.Nodes.Add($"预计耗时: {op.MachiningTime_MIN} 分钟"); 
                 stepNode.Nodes.Add($"主轴转速: {op.SpindleSpeed_RPM} RPM");
                 stepNode.Nodes.Add($"进给速率: {op.FeedRate_MMPM} mm/min");
         
@@ -495,7 +496,7 @@ namespace DataProcessSystem
             {
                 treeViewData.Visible = false;
                 rtbPrompt.Visible = true;
-                btnToggleView.Text = "切换至结构化数据 (JSON)";
+                btnToggleView.Text = "切换至结构化数据";
                 btnToggleView.BackColor = Color.LightGreen; // 给个颜色提示
             }
             else
@@ -503,7 +504,7 @@ namespace DataProcessSystem
                 // 如果当前显示的是文本 (自然语言)
                 rtbPrompt.Visible = false;
                 treeViewData.Visible = true;
-                btnToggleView.Text = "切换至大模型提示词 (Prompt)";
+                btnToggleView.Text = "切换至大模型提示词";
                 btnToggleView.BackColor = SystemColors.Control;
             }
         }

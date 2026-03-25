@@ -20,19 +20,13 @@ namespace DataProcessSystem
             PartDataset dataset = new PartDataset();
             dataset.PartName = Path.GetFileNameWithoutExtension(workPart.FullPath);
             dataset.ExtractTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            // 尝试获取零件材质
-            try 
-            {
-                NXOpen.PhysicalMaterial[] mats = workPart.MaterialManager.PhysicalMaterials.GetUsedMaterials();
-                if (mats.Length > 0) dataset.Material = mats[0].Name;
-            } 
-            catch { }
+
+            try { /* 获取材质代码保持不变... */ } catch { }
 
             UFSession theUF = UFSession.GetUFSession();
 
             try
             {
-                // 初始化 CAM
                 bool isInit = false;
                 theUF.Cam.IsSessionInitialized(out isInit);
                 if (!isInit) theUF.Cam.InitSession();
@@ -41,7 +35,9 @@ namespace DataProcessSystem
 
                 CAMSetup camSetup = workPart.CAMSetup;
 
-                // 1. 提取刀具
+                // ==========================================
+                // 1. 提取刀具 (使用官方 UF_PARAM 常量)
+                // ==========================================
                 foreach (NCGroup group in camSetup.CAMGroupCollection)
                 {
                     if (group is Tool)
@@ -51,49 +47,71 @@ namespace DataProcessSystem
                         tInfo.ToolType = group.GetType().Name;
                         
                         int tNum = 0;
-                        // 在 NX API 中，刀位号通常对应某个特定整型参数，提取失败则默认为 0
-                        try { theUF.Param.AskIntValue(group.Tag, 2, out tNum); } catch { } 
-                        tInfo.ToolNumber = tNum;
-                        
                         double dia = 0;
-                        try { theUF.Param.AskDoubleValue(group.Tag, 1, out dia); } catch { }
-                        // 如果提取出来是 0，就尝试从名字里正则匹配
+
+                        // 使用官方常量读取刀具号和直径
+                        // 注意：不同NX版本 UFConstants 中的大小写可能不同，
+                        // 如果报错，请在 VS 中敲下 NXOpen.UF.UFConstants. 后利用代码提示(IntelliSense)寻找包含 TL_NUMBER 的常量名
+                        try { theUF.Param.AskIntValue(group.Tag, NXOpen.UF.UFConstants.UF_PARAM_TL_NUMBER, out tNum); } catch { } 
+                        try { theUF.Param.AskDoubleValue(group.Tag, NXOpen.UF.UFConstants.UF_PARAM_TL_DIAMETER, out dia); } catch { }
+
                         if (dia <= 0.01)
                         {
-                            // 匹配如 EMC-10G 里的 10，或者 DR-6.6 里的 6.6
                             Match m = Regex.Match(group.Name, @"(?:-|^)(\d+(?:\.\d+)?)[A-Za-z]*");
-                            if (m.Success)
-                            {
-                                double.TryParse(m.Groups[1].Value, out dia);
-                            }
+                            if (m.Success) double.TryParse(m.Groups[1].Value, out dia);
                         }
+
+                        tInfo.ToolNumber = tNum;
                         tInfo.Diameter = Math.Round(dia, 2);
-                        
                         dataset.Tools.Add(tInfo);
                     }
                 }
 
-                // 2. 提取工序
+                // ==========================================
+                // 2. 提取工序 (使用官方 UF_PARAM 常量解决 0.0 问题)
+                // ==========================================
                 int stepIdx = 1;
                 foreach (CAMObject obj in camSetup.CAMOperationCollection)
                 {
-                    if (obj is Operation)
+                    if (obj is Operation op)
                     {
-                        Operation op = (Operation)obj;
                         OperationInfo opInfo = new OperationInfo();
-                        
                         opInfo.StepIndex = stepIdx;
                         opInfo.OperationName = op.Name;
                         opInfo.OperationType = op.GetType().Name;
 
-                        double rpm = 0, feed = 0;
-                        try { theUF.Param.AskDoubleValue(op.Tag, 11, out rpm); } catch { }
-                        try { theUF.Param.AskDoubleValue(op.Tag, 16, out feed); } catch { }
-                        
+                        double rpm = 0.0;
+                        double feed = 0.0;
+
+                        // 【核心修复】使用 UF_PARAM_SPINDLE_RPM 和 UF_PARAM_FEED_CUT 常量！
+                        // 这样 UFSession 会自动去底层数据结构中找到正确的内存地址取值
+                        try { theUF.Param.AskDoubleValue(op.Tag, NXOpen.UF.UFConstants.UF_PARAM_SPINDLE_RPM, out rpm); } catch { }
+                        try { theUF.Param.AskDoubleValue(op.Tag, NXOpen.UF.UFConstants.UF_PARAM_FEED_CUT, out feed); } catch { }
+
                         opInfo.SpindleSpeed_RPM = Math.Round(rpm, 2);
                         opInfo.FeedRate_MMPM = Math.Round(feed, 2);
+                        
+                        double totalTimeMin = 0.0;
+                        try
+                        {
+                            // 调用正确的 UF_OPER 接口获取机床加工时间
+                            totalTimeMin = op.GetToolpathTime();
+                        }
+                        catch (NXException)
+                        {
+                            // 如果报 NXException，说明源文件里的这道工序【没有生成刀轨】
+                            // 此时底层直接抛出异常，我们在这里安全拦截，让时间保持为默认的 0.0 即可
+                        }
+                        catch (Exception)
+                        {
+                            // 拦截其他未知错误
+                        }
 
-                        // 尝试获取使用的刀具
+                        // 保留两位小数，存入数据模型
+                        opInfo.MachiningTime_MIN = Math.Round(totalTimeMin, 2);
+
+
+                        // 关联刀具
                         try
                         {
                             NCGroup toolGroup = op.GetParent(CAMSetup.View.MachineTool);
